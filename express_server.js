@@ -57,10 +57,8 @@ app.post("/urls", (req, res) => {
   const longURL = req.body.longURL;
   const shortURL = generateRandomString();
 
-  // Save the id-longURL pair to the urlDatabase;
   urlDatabase[shortURL] = longURL;
 
-  // Redirect the user to the new short URL they created
   res.redirect(`/urls/${shortURL}`);
 });
 
@@ -68,6 +66,15 @@ app.post("/urls/:id/delete", (req, res) => {
   delete urlDatabase[req.params.id];
   res.redirect("/urls");
 });
+
+app.post("/urls:id", (req, res) => {
+  const shortURL = req.params.id;
+  const newLongURL = req.body.longURL;
+
+  urlDatabase[shortURL] = newLongURL;
+  
+  res.redirect("/urls");
+})
 
 app.get("/u/:id", (req, res) => {
   const shortURL = req.params.id;
