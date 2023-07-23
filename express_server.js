@@ -27,10 +27,6 @@ app.get("/", (req, res) => {
   res.send("Hello!");
 });
 
-app.listen(PORT, () => {
-  console.log(`Example app listening on port ${PORT}!`);
-});
-
 app.get("/urls.json", (req, res) => {
   res.json(urlDatabase);
 });
@@ -85,4 +81,16 @@ app.get("/u/:id", (req, res) => {
   } else {
     res.status(404).send("Short URL not found");
   }
+});
+
+app.post("/login", (req, res) => {
+  const username = req.body.username;
+
+  res.cookie("username", username);
+
+  res.redirect("/urls");
+});
+
+app.listen(PORT, () => {
+  console.log(`Example app listening on port ${PORT}!`);
 });
