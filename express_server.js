@@ -117,6 +117,16 @@ app.get("/register", (req, res) => {
   res.render("urls_register", templateVars);
 });
 
+// Helper function to check if email already exists in users object
+const getUserByEmail = (email) => {
+  for (const userId in users) {
+    if (users[userId].email === email) {
+      return users[userId];
+    }
+  }
+  return null;
+};
+
 const addUser = ({ email, password }) => {
   const newUserId = generateRandomString();
   users[newUserId] = {
@@ -138,6 +148,9 @@ app.post("/register", (req, res) => {
     return res.status(400).send('Invalid email format');
   } else if (password === '') {
     return res.status(400).send('Password is required');
+  }
+  if (getUserByEmail(email)) {
+    return res.status(400).send('Email is already registered');
   }
   const newUser = addUser(req.body);
   res.cookie('user_id', newUser.id);
