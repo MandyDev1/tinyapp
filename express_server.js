@@ -99,6 +99,11 @@ app.get("/u/:id", (req, res) => {
   }
 });
 
+app.get("/login", (req, res) => {
+  const templateVars = { user: req.cookies['user_id']};
+  res.render('urls_login', templateVars);
+});
+
 app.post("/login", (req, res) => {
   const user_id = req.body.user_id;
   res.cookie('user_id', user_id);

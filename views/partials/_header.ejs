@@ -25,10 +25,8 @@
           <button type="submit" class="btn btn-outline-light my-2 my-sm-0">Logout</button>
         </form>
         <% } else { %>
-          <form method="POST" action="/login" class="form-inline my-2 my-lg-0 ml-auto">
-            <input class="form-control mr-sm-2" type="text" placeholder="User_ID" name="user_id" required>
-            <button class="btn btn-outline-light my-2 my-sm-0" type="submit">Login</button>
-          </form>
+          <a href="/register" class="btn btn-outline-light mr-2">Register</a>
+          <a href="login" class="btn btn-outline-light my-2 my-sm-0">Login</a>
           <% } %>
     </div>
   </nav>
