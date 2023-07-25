@@ -49,6 +49,7 @@ app.get("/hello", (req, res) => {
   res.send("<html><body>Hello <b>World</b></body></html>\n");
 });
 
+// Display the URLs for the logged-in user, or redirect to login page
 app.get("/urls", (req, res) => {
   const user_id = req.cookies.user_id;
   const user = users[user_id];
@@ -56,6 +57,7 @@ app.get("/urls", (req, res) => {
   res.render("urls_index", templateVars);
 });
 
+// Display new URL creation page for the logged-in user, or redirect to login page
 app.get("/urls/new", (req, res) => {
   const user_id = req.cookies['user_id'];
   const user = users[user_id];
@@ -76,6 +78,7 @@ app.get("/urls/:id", (req, res) => {
   res.render("urls_show", templateVars);
 });
 
+// // Create new URL and save it to the database
 app.post("/urls", (req, res) => {
   const longURL = req.body.longURL;
   const shortURL = generateRandomString();
@@ -83,11 +86,13 @@ app.post("/urls", (req, res) => {
   res.redirect(`/urls/${shortURL}`);
 });
 
+// Delete a specific URL from the database
 app.post("/urls/:id/delete", (req, res) => {
   delete urlDatabase[req.params.id];
   res.redirect("/urls");
 });
 
+// Edit the long URL of a specific short URL
 app.post("/urls:id", (req, res) => {
   const shortURL = req.params.id;
   const newLongURL = req.body.longURL;
@@ -95,6 +100,7 @@ app.post("/urls:id", (req, res) => {
   res.redirect("/urls");
 })
 
+// Redirect to the original long URL via short URL
 app.get("/u/:id", (req, res) => {
   const shortURL = req.params.id;
   const longURL = urlDatabase[shortURL];
@@ -105,11 +111,13 @@ app.get("/u/:id", (req, res) => {
   }
 });
 
+// Display login page
 app.get("/login", (req, res) => {
   const templateVars = { user: req.cookies['user_id']};
   res.render('urls_login', templateVars);
 });
 
+// Handle user login request
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
   const user = getUserByEmail(email);
@@ -123,11 +131,13 @@ app.post("/login", (req, res) => {
   res.redirect("/urls");
 });
 
+// Handle user logout request
 app.post("/logout", (req, res) => {
   res.clearCookie('user_id');
   res.redirect("/login");
 });
 
+// Display user registration page
 app.get("/register", (req, res) => {
   const user_id = req.cookies.user_id;
   const user = users[user_id];
@@ -145,6 +155,7 @@ const getUserByEmail = (email) => {
   return null;
 };
 
+// Helper function to add a new user to the users object
 const addUser = ({ email, password }) => {
   const newUserId = generateRandomString();
   users[newUserId] = {
@@ -155,11 +166,13 @@ const addUser = ({ email, password }) => {
   return users[newUserId];
 };
 
+// Helper function to validate email format
 const isValidEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
 
+// Handle user registration request
 app.post("/register", (req, res) => {
   const { email, password } = req.body;
   if (!isValidEmail(email)) {
