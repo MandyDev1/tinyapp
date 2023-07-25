@@ -57,8 +57,14 @@ app.get("/urls", (req, res) => {
 });
 
 app.get("/urls/new", (req, res) => {
-  const templateVars = { user_id: req.cookies['user_id'] };
-  res.render("urls_new", templateVars);
+  const user_id = req.cookies['user_id'];
+  const user = users[user_id];
+  const templateVars = { user };
+  if (user) {
+    res.render("urls_new", templateVars);
+  } else {
+    res.render("urls_login", templateVars);
+  }
 });
 
 app.get("/urls/:id", (req, res) => {
@@ -105,14 +111,21 @@ app.get("/login", (req, res) => {
 });
 
 app.post("/login", (req, res) => {
-  const user_id = req.body.user_id;
-  res.cookie('user_id', user_id);
-  res.status(400).send('Something went wrong, please try again.');
+  const { email, password } = req.body;
+  const user = getUserByEmail(email);
+  if (!user) {
+    return res.status(403).send('User with this email does not exist');
+  }
+  if (user.password !== password) {
+    return res.status(403).send('Invalid password');
+  }
+  res.cookie('user_id', user.id);
+  res.redirect("/urls");
 });
 
 app.post("/logout", (req, res) => {
   res.clearCookie('user_id');
-  res.redirect("/urls");
+  res.redirect("/login");
 });
 
 app.get("/register", (req, res) => {
