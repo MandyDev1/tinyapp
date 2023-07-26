@@ -61,11 +61,11 @@ app.get("/urls", (req, res) => {
 app.get("/urls/new", (req, res) => {
   const user_id = req.cookies['user_id'];
   const user = users[user_id];
-  const templateVars = { user };
   if (user) {
+    const templateVars = { user };
     res.render("urls_new", templateVars);
   } else {
-    res.render("urls_login", templateVars);
+    res.redirect("/login");
   }
 });
 
@@ -78,8 +78,13 @@ app.get("/urls/:id", (req, res) => {
   res.render("urls_show", templateVars);
 });
 
-// // Create new URL and save it to the database
+// Create new URL and save it to the database if the user is logged in
 app.post("/urls", (req, res) => {
+  const user_id = req.cookies['user_id'];
+  const user = users[user_id];
+  if (!user) {
+    return res.status(401).send("You need to log in to create short URLs.");
+  }
   const longURL = req.body.longURL;
   const shortURL = generateRandomString();
   urlDatabase[shortURL] = longURL;
@@ -107,14 +112,20 @@ app.get("/u/:id", (req, res) => {
   if (longURL) {
     res.redirect(longURL);
   } else {
-    res.status(404).send("Short URL not found");
+    res.status(404).send("<h2>Short URL not found</h2>");
   }
 });
 
-// Display login page
+// Display login page, if user is logged in, redirect to /urls
 app.get("/login", (req, res) => {
-  const templateVars = { user: req.cookies['user_id']};
-  res.render('urls_login', templateVars);
+  const user_id = req.cookies['user_id'];
+  const user = users[user_id];
+  if (user) {
+    res.redirect("/urls");
+  } else {
+    const templateVars = { user };
+    res.render('urls_login', templateVars);
+  }
 });
 
 // Handle user login request
@@ -137,12 +148,16 @@ app.post("/logout", (req, res) => {
   res.redirect("/login");
 });
 
-// Display user registration page
+// Display user registration page, if user is logged in, redirect to /urls
 app.get("/register", (req, res) => {
   const user_id = req.cookies.user_id;
   const user = users[user_id];
-  const templateVars = { user };
-  res.render("urls_register", templateVars);
+  if (user) {
+    res.redirect("/urls");
+  } else {
+    const templateVars = { user };
+    res.render("urls_register", templateVars);
+  }
 });
 
 // Helper function to check if email already exists in users object
