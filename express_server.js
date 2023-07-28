@@ -1,8 +1,9 @@
 const express = require("express");
+const cookieParser = require("cookie-parser");
 const app = express();
 const PORT = 8080;
+const bcrypt = require("bcryptjs");
 app.use(express.urlencoded({ extended: true }));
-const cookieParser = require("cookie-parser");
 app.use(cookieParser());
 app.set("view engine", "ejs");
 
@@ -202,7 +203,9 @@ app.post("/login", (req, res) => {
   if (!user) {
     return res.status(403).send('User with this email does not exist');
   }
-  if (user.password !== password) {
+  // Compare the provided password with the hashed password stored in the user object
+  const passwordMatch = bcrypt.compareSync(password, user.password);
+  if (!passwordMatch) {
     return res.status(403).send('Invalid password');
   }
   res.cookie('user_id', user.id);
@@ -265,7 +268,8 @@ app.post("/register", (req, res) => {
   if (getUserByEmail(email)) {
     return res.status(400).send('Email is already registered');
   }
-  const newUser = addUser(req.body);
+  const hashedPassword = bcrypt.hashSync(password, 10); // Hash the password
+  const newUser = addUser({ email, password: hashedPassword }); // Save the hashed password
   res.cookie('user_id', newUser.id);
   res.redirect("/urls");
 });
