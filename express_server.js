@@ -6,9 +6,16 @@ const cookieParser = require("cookie-parser");
 app.use(cookieParser());
 app.set("view engine", "ejs");
 
+// New urlDatabase structure
 const urlDatabase = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
+  "b2xVn2": {
+    longURL: "http://www.lighthouselabs.ca",
+    userID: "userRandomID",
+  },
+  "9sm5xK": {
+    longURL: "http://www.google.com",
+    userID: "user2RandomID",
+  },
 };
 
 const users = {
@@ -49,13 +56,29 @@ app.get("/hello", (req, res) => {
   res.send("<html><body>Hello <b>World</b></body></html>\n");
 });
 
-// Display the URLs for the logged-in user, or redirect to login page
+// Display the URLs for the logged-in user, or return an error message if user is not logged in
 app.get("/urls", (req, res) => {
   const user_id = req.cookies.user_id;
   const user = users[user_id];
-  const templateVars = { urls: urlDatabase, user };
+  if (!user) {
+    // User is not logged in, return an error message
+    return res.send("<h1>Login Required</h1><p>You need to log in to access the URL page. <a href='/login'>Click here to log in</a>.</p>");
+  }
+  const userUrls = urlsForUser(user_id);
+  const templateVars = { urls: userUrls, user };
   res.render("urls_index", templateVars);
 });
+
+// Helper function to return URLs where the userID is equal to the id of the currently logged-in user
+const urlsForUser = (id) => {
+  const userUrls = {};
+  for (const shortURL in urlDatabase) {
+    if (urlDatabase[shortURL].userID === id) {
+      userUrls[shortURL] = urlDatabase[shortURL];
+    }
+  }
+  return userUrls;
+}
 
 // Display new URL creation page for the logged-in user, or redirect to login page
 app.get("/urls/new", (req, res) => {
@@ -69,12 +92,25 @@ app.get("/urls/new", (req, res) => {
   }
 });
 
+// Display individual URL page (GET /urls/:id) for the logged-in user, or return relevant error messages
 app.get("/urls/:id", (req, res) => {
-  const templateVars = { 
-    id: req.params.id, 
-    longURL: urlDatabase[req.params.id],
-    user_id: req.cookies['user_id']
-   };
+  const user_id = req.cookies.user_id;
+  const user = users[user_id];
+  if (!user) {
+    // User is not logged-in, display an error message
+    return res.send("<h2>You need to log in to view this URL.</h2>");
+  }
+  const shortURL = req.params.id;
+  const url = urlDatabase[shortURL];
+  if (!url || url.userID !== user_id) {
+    // URL doesn't exist or doesn't belong to the user, display an error message
+    return res.status(403).send("<h2>You do not have permission to view this URL.</h2>");
+  }
+  const templateVars = {
+    id: shortURL,
+    longURL: url.longURL, // Access longURL from the new urlDatabase structure
+    user_id,
+  }
   res.render("urls_show", templateVars);
 });
 
@@ -93,17 +129,48 @@ app.post("/urls", (req, res) => {
 
 // Delete a specific URL from the database
 app.post("/urls/:id/delete", (req, res) => {
-  delete urlDatabase[req.params.id];
+  const user_id = req.cookies['user_id'];
+  const user = users[user_id];
+  if (!user) {
+    // User is not logged in, send an error message
+    return res.status(401).send("<h2>You need to log in to delete the URL.</h2>");
+  }
+  const shortURL = req.params.id;
+  const url = urlDatabase[shortURL];
+  if (!url) {
+    // URL doesn't exist, return an error message
+    return res.status(404).send("<h2>URL not found.</h2>"); 
+  }
+  if (url.userID !== user_id) {
+    // User doesn't own the URL, return an error message
+    return res.status(403).send("<h2>You do not have permission to delete this URL.");
+  }
+  delete urlDatabase[shortURL];
   res.redirect("/urls");
 });
 
 // Edit the long URL of a specific short URL
 app.post("/urls:id", (req, res) => {
+  const user_id = req.cookies['user_id'];
+  const user = users[user_id];
+  if (!user) {
+    // User is not logged in, return an error message
+    return res.status(401).send("<h2>You need to log in to edit this URL.</h2>");
+  }
   const shortURL = req.params.id;
+  const url = urlDatabase[shortURL];
+  if (!url) {
+    // URL doesn't exist, return an error message
+    return res.status(404).send("<h2>URL not found.</h2>");
+  }
+  if (url.userID !== user_id) {
+    // User doesn't own the URL, return an error message
+    return res.status(403).send("<h2>You do not have permission to edit this URL.</h2>");
+  }
   const newLongURL = req.body.longURL;
-  urlDatabase[shortURL] = newLongURL;
+  urlDatabase[shortURL].longURL = newLongURL;
   res.redirect("/urls");
-})
+});
 
 // Redirect to the original long URL via short URL
 app.get("/u/:id", (req, res) => {
