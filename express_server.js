@@ -1,10 +1,15 @@
 const express = require("express");
-const cookieParser = require("cookie-parser");
+const cookieSession = require("cookie-session");
 const app = express();
 const PORT = 8080;
 const bcrypt = require("bcryptjs");
+const { getUserByEmail } = require("./helpers");
+
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
+app.use(cookieSession({
+  name: 'session',
+  keys: ['mySecrectKey']
+}));
 app.set("view engine", "ejs");
 
 // New urlDatabase structure
@@ -59,7 +64,7 @@ app.get("/hello", (req, res) => {
 
 // Display the URLs for the logged-in user, or return an error message if user is not logged in
 app.get("/urls", (req, res) => {
-  const user_id = req.cookies.user_id;
+  const user_id = req.session.user_id;
   const user = users[user_id];
   if (!user) {
     // User is not logged in, return an error message
@@ -83,7 +88,7 @@ const urlsForUser = (id) => {
 
 // Display new URL creation page for the logged-in user, or redirect to login page
 app.get("/urls/new", (req, res) => {
-  const user_id = req.cookies['user_id'];
+  const user_id = req.session.user_id;
   const user = users[user_id];
   if (user) {
     const templateVars = { user };
@@ -95,7 +100,7 @@ app.get("/urls/new", (req, res) => {
 
 // Display individual URL page (GET /urls/:id) for the logged-in user, or return relevant error messages
 app.get("/urls/:id", (req, res) => {
-  const user_id = req.cookies.user_id;
+  const user_id = req.session.user_id;
   const user = users[user_id];
   if (!user) {
     // User is not logged-in, display an error message
@@ -117,20 +122,23 @@ app.get("/urls/:id", (req, res) => {
 
 // Create new URL and save it to the database if the user is logged in
 app.post("/urls", (req, res) => {
-  const user_id = req.cookies['user_id'];
+  const user_id = req.session.user_id;
   const user = users[user_id];
   if (!user) {
     return res.status(401).send("You need to log in to create short URLs.");
   }
   const longURL = req.body.longURL;
   const shortURL = generateRandomString();
-  urlDatabase[shortURL] = longURL;
+  urlDatabase[shortURL] = {
+    longURL,
+    userID: user_id,
+  };
   res.redirect(`/urls/${shortURL}`);
 });
 
 // Delete a specific URL from the database
 app.post("/urls/:id/delete", (req, res) => {
-  const user_id = req.cookies['user_id'];
+  const user_id = req.session.user_id;
   const user = users[user_id];
   if (!user) {
     // User is not logged in, send an error message
@@ -152,7 +160,7 @@ app.post("/urls/:id/delete", (req, res) => {
 
 // Edit the long URL of a specific short URL
 app.post("/urls:id", (req, res) => {
-  const user_id = req.cookies['user_id'];
+  const user_id = req.session.user_id;
   const user = users[user_id];
   if (!user) {
     // User is not logged in, return an error message
@@ -186,7 +194,7 @@ app.get("/u/:id", (req, res) => {
 
 // Display login page, if user is logged in, redirect to /urls
 app.get("/login", (req, res) => {
-  const user_id = req.cookies['user_id'];
+  const user_id = req.session.user_id;
   const user = users[user_id];
   if (user) {
     res.redirect("/urls");
@@ -199,7 +207,7 @@ app.get("/login", (req, res) => {
 // Handle user login request
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
-  const user = getUserByEmail(email);
+  const user = getUserByEmail(email, users);
   if (!user) {
     return res.status(403).send('User with this email does not exist');
   }
@@ -220,7 +228,7 @@ app.post("/logout", (req, res) => {
 
 // Display user registration page, if user is logged in, redirect to /urls
 app.get("/register", (req, res) => {
-  const user_id = req.cookies.user_id;
+  const user_id = req.session.user_id;
   const user = users[user_id];
   if (user) {
     res.redirect("/urls");
@@ -229,16 +237,6 @@ app.get("/register", (req, res) => {
     res.render("urls_register", templateVars);
   }
 });
-
-// Helper function to check if email already exists in users object
-const getUserByEmail = (email) => {
-  for (const userId in users) {
-    if (users[userId].email === email) {
-      return users[userId];
-    }
-  }
-  return null;
-};
 
 // Helper function to add a new user to the users object
 const addUser = ({ email, password }) => {
@@ -265,8 +263,8 @@ app.post("/register", (req, res) => {
   } else if (password === '') {
     return res.status(400).send('Password is required');
   }
-  if (getUserByEmail(email)) {
-    return res.status(400).send('Email is already registered');
+  if (getUserByEmail(email, users)) {
+    return res.status(400).send('This email is already registered');
   }
   const hashedPassword = bcrypt.hashSync(password, 10); // Hash the password
   const newUser = addUser({ email, password: hashedPassword }); // Save the hashed password
