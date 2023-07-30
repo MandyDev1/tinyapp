@@ -41,13 +41,39 @@ function generateRandomString() {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   const length = 6;
   let randomString = '';
-
   for (let i = 0; i < length; i++) {
     const randomIndex = Math.floor(Math.random() * characters.length);
     randomString += characters[randomIndex];
   }
-
   return randomString;
+};
+
+// Helper function to return URLs where the userID is equal to the id of the currently logged-in user
+const urlsForUser = (id) => {
+  const userUrls = {};
+  for (const shortURL in urlDatabase) {
+    if (urlDatabase[shortURL].userID === id) {
+      userUrls[shortURL] = urlDatabase[shortURL];
+    }
+  }
+  return userUrls;
+}
+
+// Helper function to add a new user to the users object
+const addUser = ({ email, password }) => {
+  const newUserId = generateRandomString();
+  users[newUserId] = {
+    id: newUserId,
+    email,
+    password
+  };
+  return users[newUserId];
+};
+
+// Helper function to validate email format
+const isValidEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
 };
 
 app.get("/", (req, res) => {
@@ -74,17 +100,6 @@ app.get("/urls", (req, res) => {
   const templateVars = { urls: userUrls, user };
   res.render("urls_index", templateVars);
 });
-
-// Helper function to return URLs where the userID is equal to the id of the currently logged-in user
-const urlsForUser = (id) => {
-  const userUrls = {};
-  for (const shortURL in urlDatabase) {
-    if (urlDatabase[shortURL].userID === id) {
-      userUrls[shortURL] = urlDatabase[shortURL];
-    }
-  }
-  return userUrls;
-}
 
 // Display new URL creation page for the logged-in user, or redirect to login page
 app.get("/urls/new", (req, res) => {
@@ -115,7 +130,7 @@ app.get("/urls/:id", (req, res) => {
   const templateVars = {
     id: shortURL,
     longURL: url.longURL, // Access longURL from the new urlDatabase structure
-    user_id,
+    user,
   }
   res.render("urls_show", templateVars);
 });
@@ -148,7 +163,7 @@ app.post("/urls/:id/delete", (req, res) => {
   const url = urlDatabase[shortURL];
   if (!url) {
     // URL doesn't exist, return an error message
-    return res.status(404).send("<h2>URL not found.</h2>"); 
+    return res.status(404).send("<h2>URL not found.</h2>");
   }
   if (url.userID !== user_id) {
     // User doesn't own the URL, return an error message
@@ -192,6 +207,41 @@ app.get("/u/:id", (req, res) => {
   }
 });
 
+
+// REGISTRATION ROUTES
+
+// Display user registration page, if user is logged in, redirect to /urls
+app.get("/register", (req, res) => {
+  const user_id = req.session.user_id;
+  const user = users[user_id];
+  if (user) {
+    res.redirect("/urls");
+  } else {
+    const templateVars = { user };
+    res.render("urls_register", templateVars);
+  }
+});
+
+// Handle user registration request
+app.post("/register", (req, res) => {
+  const { email, password } = req.body;
+  if (!isValidEmail(email)) {
+    return res.status(400).send('Invalid email format');
+  } else if (password === '') {
+    return res.status(400).send('Password is required');
+  }
+  if (getUserByEmail(email, users)) {
+    return res.status(400).send('This email is already registered');
+  }
+  const hashedPassword = bcrypt.hashSync(password, 10);
+  const newUser = addUser({ email: req.body.email, password: hashedPassword });
+  req.session.user_id = newUser.id;
+  res.redirect("/urls");
+});
+
+
+// LOGIN ROUTES
+
 // Display login page, if user is logged in, redirect to /urls
 app.get("/login", (req, res) => {
   const user_id = req.session.user_id;
@@ -211,65 +261,21 @@ app.post("/login", (req, res) => {
   if (!user) {
     return res.status(403).send('User with this email does not exist');
   }
-  // Compare the provided password with the hashed password stored in the user object
+
+  // The next line will compare the provided password with the hashed password stored in the user object
   const passwordMatch = bcrypt.compareSync(password, user.password);
+
   if (!passwordMatch) {
     return res.status(403).send('Invalid password');
   }
-  res.cookie('user_id', user.id);
+  req.session.user_id = user.id;
   res.redirect("/urls");
 });
 
 // Handle user logout request
 app.post("/logout", (req, res) => {
-  res.clearCookie('user_id');
+  req.session = null;
   res.redirect("/login");
-});
-
-// Display user registration page, if user is logged in, redirect to /urls
-app.get("/register", (req, res) => {
-  const user_id = req.session.user_id;
-  const user = users[user_id];
-  if (user) {
-    res.redirect("/urls");
-  } else {
-    const templateVars = { user };
-    res.render("urls_register", templateVars);
-  }
-});
-
-// Helper function to add a new user to the users object
-const addUser = ({ email, password }) => {
-  const newUserId = generateRandomString();
-  users[newUserId] = {
-    id: newUserId,
-    email,
-    password
-  };
-  return users[newUserId];
-};
-
-// Helper function to validate email format
-const isValidEmail = (email) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-// Handle user registration request
-app.post("/register", (req, res) => {
-  const { email, password } = req.body;
-  if (!isValidEmail(email)) {
-    return res.status(400).send('Invalid email format');
-  } else if (password === '') {
-    return res.status(400).send('Password is required');
-  }
-  if (getUserByEmail(email, users)) {
-    return res.status(400).send('This email is already registered');
-  }
-  const hashedPassword = bcrypt.hashSync(password, 10); // Hash the password
-  const newUser = addUser({ email, password: hashedPassword }); // Save the hashed password
-  res.cookie('user_id', newUser.id);
-  res.redirect("/urls");
 });
 
 app.listen(PORT, () => {
